@@ -8,15 +8,15 @@ import matplotlib.pyplot as plt
 import easygui as gui
 import adjustText
 import calendar
-from datetime import datetime
+import datetime
 from pandas_datareader import data as web
 
 
 def create_input_dialog():
-    gui_text = "Enter the following details"
+    gui_text = "Enter the stock symbol and dates"
     gui_title = "TradeAlgorithm v1.0"
     gui_input_list = ["Stock Symbol", "Initial Date (YYYYmmdd)", "End Date (YYYYmmdd)"]
-    gui_default_list = ["AAPL", "20150101", datetime.today().strftime("%Y%m%d")]
+    gui_default_list = ["AAPL", "20150101", datetime.datetime.today().strftime("%Y%m%d")]
     gui_output = gui.multenterbox(gui_text, gui_title, gui_input_list, gui_default_list)
     return gui_output
 
@@ -93,13 +93,55 @@ def trade_algorithm():
             else:
                 sig_price_buy.append(np.nan)
                 sig_price_sell.append(np.nan)
-
         return sig_price_buy, sig_price_sell
+
+    # Create a function to calculate gain and loss for each trade
+    def calculate_gain_loss(data):
+        global buy_signals
+        global sell_signals
+
+        buy_signals = []
+        sell_signals = []
+        gain_loss = []
+
+        global first_is_buy
+        first_is_buy = True
+
+        min_date_buy = data["Buy_Signal_Price"].first_valid_index()
+        min_date_sell = data["Sell_Signal_Price"].first_valid_index()
+
+        if min_date_buy > min_date_sell:
+            first_is_buy = False
+
+        for row in range(len(data)):
+            if not pd.isnull(data["Buy_Signal_Price"][row]):
+                buy_signals.append(round(data["Buy_Signal_Price"][row], 2))
+            if not pd.isnull(data["Sell_Signal_Price"][row]):
+                sell_signals.append(round(data["Sell_Signal_Price"][row], 2))
+
+        buy_len = len(buy_signals)
+        sell_len = len(sell_signals)
+
+        if buy_len <= sell_len:
+            gain_loss_len = buy_len
+        else:
+            gain_loss_len = sell_len
+
+        if first_is_buy:
+            for i in range(gain_loss_len):
+                gain_loss.append(round((sell_signals[i] / buy_signals[i] - 1) * 100, 2))
+        else:
+            for i in range(gain_loss_len - 1):
+                gain_loss.append(round((sell_signals[i + 1] / buy_signals[i] - 1) * 100, 2))
+        return gain_loss
 
     # Store the buy and sell data into a variable
     buy_sell = buy_sell(data)
     data["Buy_Signal_Price"] = buy_sell[0]
     data["Sell_Signal_Price"] = buy_sell[1]
+
+    # Store the gains and losses into a variable
+    gain_loss = calculate_gain_loss(data)
 
     # Visualize the data and the strategy to buy and sell the stock
     max_price = data["Price"].max()
@@ -117,16 +159,99 @@ def trade_algorithm():
 
     # Show labels
     # To Do: switch annotate() to text() and use adjustText lib to avoid overlap
-    # To Do: add arrow from buy to sell
-    # To Do: add gain and loss (percentage) per trade [ (sell signal value - buy signal value) * 100 ]
+    # To Do: add gain and loss (percentage) per trade [ (sell signal value / buy signal value) * 100 ]
+    buy_signal_list = []
+    sell_signal_list = []
+
     for row in range(len(data)):
         if not pd.isnull(data["Buy_Signal_Price"][row]):
-            y_adjust = int(max_price - 20 - data["Price"][row])
-            plt.annotate(round(data["Price"][row],2), xy=(data["Date"][row], int(data["Price"][row])+y_adjust), color="green", size="10")
+            plt.annotate(round(data["Price"][row], 2), xy=(data["Date"][row], max_price/100*90),
+                         color="green", size="10")
+            buy_signal_list.append([data["Date"][row], data["Price"][row]])
+
         if not pd.isnull(data["Sell_Signal_Price"][row]):
-            y_adjust = int(max_price - 25 - data["Price"][row])
-            plt.annotate(round(data["Price"][row],2), xy=(data["Date"][row], int(data["Price"][row])+y_adjust), color="red", size="10")
+            plt.annotate(round(data["Price"][row], 2), xy=(data["Date"][row], max_price/100*85),
+                         color="red", size="10")
+            sell_signal_list.append([data["Date"][row], data["Price"][row]])
+
+    # Add arrow connecting buy to sell points
+    if first_is_buy:
+        color = ""
+        if len(buy_signal_list) == len(sell_signal_list):
+            for i in range(len(buy_signal_list)):
+                if(sell_signal_list[i][1] - buy_signal_list[i][1]) > 0:
+                    color = "green"
+                else:
+                    color = "red"
+                plt.arrow(buy_signal_list[i][0],
+                          buy_signal_list[i][1],
+                          (sell_signal_list[i][0] - buy_signal_list[i][0]).days,
+                          (sell_signal_list[i][1] - buy_signal_list[i][1]),
+                          color=color, width=0.2, head_width=1, head_length=5)
+                plt.text(
+                    buy_signal_list[i][0] + datetime.timedelta((sell_signal_list[i][0] - buy_signal_list[i][0]).days / 2),
+                    (sell_signal_list[i][1] + buy_signal_list[i][1]) / 2,
+                    str(gain_loss[i]) + "%",
+                    size=10,
+                    color=color)
+        else:
+            for i in range(len(buy_signal_list)-1):
+                if (sell_signal_list[i][1] - buy_signal_list[i][1]) > 0:
+                    color = "green"
+                else:
+                    color = "red"
+                plt.arrow(buy_signal_list[i][0],
+                          buy_signal_list[i][1],
+                          (sell_signal_list[i][0] - buy_signal_list[i][0]).days,
+                          (sell_signal_list[i][1] - buy_signal_list[i][1]),
+                          color=color, width=0.2, head_width=1, head_length=5)
+                plt.text(buy_signal_list[i][0] + datetime.timedelta((sell_signal_list[i][0] - buy_signal_list[i][0]).days / 2),
+                         (sell_signal_list[i][1] + buy_signal_list[i][1]) / 2,
+                         str(gain_loss[i]) + "%",
+                         size=10,
+                         color=color,
+                         )
+
+    else:
+        if len(buy_signal_list) == len(sell_signal_list):
+            for i in range(len(buy_signal_list)):
+                if (sell_signal_list[i+1][1] - buy_signal_list[i][1]) > 0:
+                    color = "green"
+                else:
+                    color = "red"
+                plt.arrow(buy_signal_list[i][0],
+                          buy_signal_list[i][1],
+                          (sell_signal_list[i+1][0] - buy_signal_list[i][0]).days,
+                          (sell_signal_list[i+1][1] - buy_signal_list[i][1]),
+                          color=color, width=0.2, head_width=1, head_length=5)
+                plt.text(
+                    buy_signal_list[i][0] + datetime.timedelta((sell_signal_list[i+1][0] - buy_signal_list[i][0]).days / 2),
+                    (sell_signal_list[i+1][1] + buy_signal_list[i][1]) / 2,
+                    str(gain_loss[i]) + "%",
+                    size=10,
+                    color=color)
+        else:
+            for i in range(len(buy_signal_list)):
+                if (sell_signal_list[i+1][1] - buy_signal_list[i][1]) > 0:
+                    color = "green"
+                else:
+                    color = "red"
+            for i in range(len(buy_signal_list)-1):
+                plt.arrow(buy_signal_list[i][0],
+                          buy_signal_list[i][1],
+                          (sell_signal_list[i+1][0] - buy_signal_list[i][0]).days,
+                          (sell_signal_list[i+1][1] - buy_signal_list[i][1]),
+                          color=color, width=0.2, head_width=1, head_length=5)
+                plt.text(
+                    buy_signal_list[i][0] + datetime.timedelta((sell_signal_list[i+1][0] - buy_signal_list[i][0]).days / 2),
+                    (sell_signal_list[i+1][1] + buy_signal_list[i][1]) / 2,
+                    str(gain_loss[i]) + "%",
+                    size=10,
+                    color=color)
+
     plt.show()
+
+
 
 
 # Call body
