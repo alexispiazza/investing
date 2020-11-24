@@ -1,5 +1,10 @@
 # Description: Dual moving average crossover to determine when to buy and sell stock.
 # TradeAlgorithm v1.0
+#
+# To Do:
+# 1. Change buy and sell labels on the top to a more friendly visual
+# 2. Handle exception in case of less than 1 signal
+
 
 # Import packages
 import pandas as pd
@@ -19,6 +24,7 @@ def create_input_dialog():
     gui_default_list = ["AAPL", "20150101", datetime.datetime.today().strftime("%Y%m%d")]
     gui_output = gui.multenterbox(gui_text, gui_title, gui_input_list, gui_default_list)
     return gui_output
+
 
 # Program body
 def trade_algorithm():
@@ -158,8 +164,6 @@ def trade_algorithm():
     plt.legend(loc="upper right")
 
     # Show labels
-    # To Do: switch annotate() to text() and use adjustText lib to avoid overlap
-    # To Do: add gain and loss (percentage) per trade [ (sell signal value / buy signal value) * 100 ]
     buy_signal_list = []
     sell_signal_list = []
 
@@ -250,8 +254,6 @@ def trade_algorithm():
                     color=color)
 
     plt.show()
-
-
 
 
 # Call body
