@@ -1,0 +1,13 @@
+'''
+data = [[10, 10, 10],
+        [10, 10, 10],
+        [10, 10, 10],
+        [10, 10, 10]]
+
+rows = ['AB', 'BC', 'SK', 'MB']
+cols = ["Gas", "Wk/Wk", "Yr/Yr", ]
+table = plt.table(cellText=data, colLabels=cols, rowLabels=rows, loc='bottom', cellLoc='center')
+table.auto_set_font_size(True)
+table.scale(1, 1)
+plt.subplots_adjust(left=0.1, top=0.9)
+'''
