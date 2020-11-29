@@ -1,9 +1,8 @@
 # Description: Dual moving average crossover to determine when to buy and sell stock.
-# TradeAlgorithm v1.0
+# TradeAlgorithm v1.1
 #
 # To Do:
-# 1. Change buy and sell labels on the top to a more friendly visual
-# 2. Handle exception in case of less than 1 signal
+# Code refactoring
 
 
 # Import packages
@@ -11,10 +10,10 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import easygui as gui
-import adjustText
 import calendar
 import datetime
 from pandas_datareader import data as web
+# import adjustText
 
 
 def create_input_dialog():
@@ -128,7 +127,7 @@ def trade_algorithm():
         buy_len = len(buy_signals)
         sell_len = len(sell_signals)
 
-        if buy_len <= sell_len:
+        if buy_len <= sell_len and first_is_buy:
             gain_loss_len = buy_len
         else:
             gain_loss_len = sell_len
@@ -147,11 +146,12 @@ def trade_algorithm():
     data["Sell_Signal_Price"] = buy_sell[1]
 
     # Store the gains and losses into a variable
-    gain_loss = calculate_gain_loss(data)
+    try:
+        gain_loss = calculate_gain_loss(data)
+    except:
+        pass
 
     # Visualize the data and the strategy to buy and sell the stock
-    max_price = data["Price"].max()
-
     plt.figure(figsize=(13, 8), num='Trade Algorithm v1.0')
     plt.plot(data["Price"], label=symbol, alpha=0.35)
     plt.plot(data["SMA30"], label = "SMA30", alpha=0.35)
@@ -167,16 +167,24 @@ def trade_algorithm():
     buy_signal_list = []
     sell_signal_list = []
 
+    # Append signal values to lists
     for row in range(len(data)):
         if not pd.isnull(data["Buy_Signal_Price"][row]):
-            plt.annotate(round(data["Price"][row], 2), xy=(data["Date"][row], max_price/100*90),
-                         color="green", size="10")
             buy_signal_list.append([data["Date"][row], data["Price"][row]])
 
         if not pd.isnull(data["Sell_Signal_Price"][row]):
-            plt.annotate(round(data["Price"][row], 2), xy=(data["Date"][row], max_price/100*85),
-                         color="red", size="10")
             sell_signal_list.append([data["Date"][row], data["Price"][row]])
+
+    # Initiate variables to draw gain and loss table
+    x_lim_left = plt.xlim()[0]
+    x_lim_right = plt.xlim()[1]
+    y_lim_bottom = plt.ylim()[0]
+    y_lim_top = plt.ylim()[1]
+
+    x_initial_pos = x_lim_left + (x_lim_right-x_lim_left)*0.1
+    y_initial_pos = y_lim_top - (y_lim_top-y_lim_bottom)*0.1
+    x_gap = (x_lim_right-x_lim_left) / 20
+    y_gap = (y_lim_top-y_lim_bottom) / 30
 
     # Add arrow connecting buy to sell points
     if first_is_buy:
@@ -187,72 +195,146 @@ def trade_algorithm():
                     color = "green"
                 else:
                     color = "red"
+                # Draw arrow
                 plt.arrow(buy_signal_list[i][0],
                           buy_signal_list[i][1],
                           (sell_signal_list[i][0] - buy_signal_list[i][0]).days,
                           (sell_signal_list[i][1] - buy_signal_list[i][1]),
                           color=color, width=0.2, head_width=1, head_length=5)
+                '''
+                # Draw label
                 plt.text(
                     buy_signal_list[i][0] + datetime.timedelta((sell_signal_list[i][0] - buy_signal_list[i][0]).days / 2),
                     (sell_signal_list[i][1] + buy_signal_list[i][1]) / 2,
                     str(gain_loss[i]) + "%",
                     size=10,
                     color=color)
+                '''
+                # Draw table
+                plt.text(x_initial_pos,
+                         y_initial_pos,
+                         round(buy_signal_list[i][1], 1),
+                         size=10)
+                plt.text(x_initial_pos,
+                         y_initial_pos - y_gap,
+                         round(sell_signal_list[i][1], 1),
+                         size=10)
+                plt.text(x_initial_pos,
+                         y_initial_pos - y_gap * 2,
+                         str(round(gain_loss[i], 1)) + "%",
+                         size=10,
+                         color=color)
+                x_initial_pos += x_gap
         else:
             for i in range(len(buy_signal_list)-1):
                 if (sell_signal_list[i][1] - buy_signal_list[i][1]) > 0:
                     color = "green"
                 else:
                     color = "red"
+                # Draw arrow
                 plt.arrow(buy_signal_list[i][0],
                           buy_signal_list[i][1],
                           (sell_signal_list[i][0] - buy_signal_list[i][0]).days,
                           (sell_signal_list[i][1] - buy_signal_list[i][1]),
                           color=color, width=0.2, head_width=1, head_length=5)
+                '''
+                # Draw label
                 plt.text(buy_signal_list[i][0] + datetime.timedelta((sell_signal_list[i][0] - buy_signal_list[i][0]).days / 2),
                          (sell_signal_list[i][1] + buy_signal_list[i][1]) / 2,
                          str(gain_loss[i]) + "%",
                          size=10,
                          color=color,
                          )
+                '''
+                # Draw table
+                plt.text(x_initial_pos,
+                         y_initial_pos,
+                         round(buy_signal_list[i][1], 1),
+                         size=10)
+                plt.text(x_initial_pos,
+                         y_initial_pos - y_gap,
+                         round(sell_signal_list[i][1], 1),
+                         size=10)
+                plt.text(x_initial_pos,
+                         y_initial_pos - y_gap * 2,
+                         str(round(gain_loss[i], 1)) + "%",
+                         size=10,
+                         color=color)
+                x_initial_pos += x_gap
 
     else:
         if len(buy_signal_list) == len(sell_signal_list):
-            for i in range(len(buy_signal_list)):
+            for i in range(len(buy_signal_list)-1):
                 if (sell_signal_list[i+1][1] - buy_signal_list[i][1]) > 0:
                     color = "green"
                 else:
                     color = "red"
+                # Draw arrow
                 plt.arrow(buy_signal_list[i][0],
                           buy_signal_list[i][1],
                           (sell_signal_list[i+1][0] - buy_signal_list[i][0]).days,
                           (sell_signal_list[i+1][1] - buy_signal_list[i][1]),
                           color=color, width=0.2, head_width=1, head_length=5)
+                '''
+                # Draw label
                 plt.text(
                     buy_signal_list[i][0] + datetime.timedelta((sell_signal_list[i+1][0] - buy_signal_list[i][0]).days / 2),
                     (sell_signal_list[i+1][1] + buy_signal_list[i][1]) / 2,
                     str(gain_loss[i]) + "%",
                     size=10,
                     color=color)
+                '''
+                # Draw table
+                plt.text(x_initial_pos,
+                         y_initial_pos,
+                         round(buy_signal_list[i][1], 1),
+                         size=10)
+                plt.text(x_initial_pos,
+                         y_initial_pos - y_gap,
+                         round(sell_signal_list[i+1][1], 1),
+                         size=10)
+                plt.text(x_initial_pos,
+                         y_initial_pos - y_gap * 2,
+                         str(round(gain_loss[i], 1)) + "%",
+                         size=10,
+                         color=color)
+                x_initial_pos += x_gap
         else:
             for i in range(len(buy_signal_list)):
                 if (sell_signal_list[i+1][1] - buy_signal_list[i][1]) > 0:
                     color = "green"
                 else:
                     color = "red"
-            for i in range(len(buy_signal_list)-1):
+                # Draw arrow
                 plt.arrow(buy_signal_list[i][0],
                           buy_signal_list[i][1],
                           (sell_signal_list[i+1][0] - buy_signal_list[i][0]).days,
                           (sell_signal_list[i+1][1] - buy_signal_list[i][1]),
                           color=color, width=0.2, head_width=1, head_length=5)
+                '''
+                # Draw label
                 plt.text(
                     buy_signal_list[i][0] + datetime.timedelta((sell_signal_list[i+1][0] - buy_signal_list[i][0]).days / 2),
                     (sell_signal_list[i+1][1] + buy_signal_list[i][1]) / 2,
                     str(gain_loss[i]) + "%",
                     size=10,
                     color=color)
-
+                '''
+                # Draw table
+                plt.text(x_initial_pos,
+                         y_initial_pos,
+                         round(buy_signal_list[i][1], 1),
+                         size=10)
+                plt.text(x_initial_pos,
+                         y_initial_pos - y_gap,
+                         round(sell_signal_list[i+1][1], 1),
+                         size=10)
+                plt.text(x_initial_pos,
+                         y_initial_pos - y_gap * 2,
+                         str(round(gain_loss[i], 1)) + "%",
+                         size=10,
+                         color=color)
+                x_initial_pos += x_gap
     plt.show()
 
 
